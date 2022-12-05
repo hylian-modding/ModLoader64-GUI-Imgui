@@ -102,3 +102,12 @@ dist
 
 # TernJS port file
 .tern-port
+
+build
+client
+dist
+tinytsc.exe
+tools/tinytsc/tinytsc-win.exe
+tools/tinytsc/tinytsc-linux
+userSettings.json
+ModLoader64-GUI-config.json
