@@ -5,7 +5,7 @@ export default class BootML {
 
     static instance: child_process.ChildProcess;
 
-    static start() {
+    static start(extra?: boolean) {
         const options = {
             stdio: ['pipe', 'pipe', 'pipe', 'ipc'],
             silent: true,
@@ -17,6 +17,9 @@ export default class BootML {
         }
         if (masterConfigObject.overrideRomPath[0] !== ""){
             args.push(`--roms=${masterConfigObject.overrideRomPath[0]}`);
+        }
+        if(extra) {
+            args.push(`--extradata=${extra}`);
         }
 
         this.instance = child_process.fork("./client/src/index.js", args, options as child_process.ForkOptions);

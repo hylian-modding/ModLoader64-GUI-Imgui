@@ -60,11 +60,12 @@ export default class GameWindow extends Window {
         for (let i = 0; i < this.roms.length; i++) {
             if (ImGui.checkbox(this.roms[i], [config.ModLoader64.rom === this.roms[i]])) {
                 config.ModLoader64.rom = this.roms[i];
+                this.refs.update();
             }
         }
         ImGui.separator();
-        if (ImGui.button("Save")) {
+        /* if (ImGui.button("Save")) {
             this.refs.update();
-        }
+        } */
     }
 }

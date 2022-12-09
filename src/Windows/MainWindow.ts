@@ -1,11 +1,13 @@
 import { Window } from "../Window";
 import { ImGui } from 'ml64tk';
-import { config, masterConfigObject, SAVE_CONFIG } from '../Config';
+import { config, ConfigObject, masterConfigObject, SAVE_CONFIG } from '../Config';
 import { DrawInputTextLeft } from '../Utils';
 import BootML from '../BootML';
 
 export default class MainWindow extends Window {
 
+    refs!: ConfigObject;
+    
     get consoleList(): string[] {
         return config.ModLoader64.supportedConsoles;
     }
@@ -20,6 +22,7 @@ export default class MainWindow extends Window {
     }
 
     onInit(): void {
+        this.refs = masterConfigObject;
     }
 
     getName(): string {
@@ -27,7 +30,7 @@ export default class MainWindow extends Window {
     }
 
     drawContents(): void {
-        if (DrawInputTextLeft("Nickname", masterConfigObject.nickname)) { }
+        if (DrawInputTextLeft("Nickname", this.refs.nickname)) { }
         ImGui.sameLine();
         if (ImGui.beginCombo("Consoles", this.console, ImGui.ComboFlags.NoPreview)) {
             for (let i = 0; i < this.consoleList.length; i++) {
@@ -40,16 +43,17 @@ export default class MainWindow extends Window {
         ImGui.sameLine();
         if(this.console === "Dolphin") {
             if(ImGui.button("Configure Dolphin")){
-                
+                BootML.start(true);
             }
         }
         else ImGui.newLine();
-        if (DrawInputTextLeft("Lobby   ", masterConfigObject.lobby)) { }
+        if (DrawInputTextLeft("Lobby   ", this.refs.lobby)) { }
         ImGui.sameLine();
         ImGui.text(`Selected Console: ${this.console}`);
-        if (DrawInputTextLeft("Password", masterConfigObject.password, ImGui.InputTextFlags.Password)) { }
+        if (DrawInputTextLeft("Password", this.refs.password, ImGui.InputTextFlags.Password)) { }
         ImGui.separator();
         if (ImGui.button("Start")) {
+            this.refs.update();
             BootML.start();
         }
     }
