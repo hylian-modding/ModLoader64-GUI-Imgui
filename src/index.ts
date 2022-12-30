@@ -1,5 +1,5 @@
 import { Application } from './Application';
-import fs from 'fs';
+import fs from 'fs-extra';
 import { template } from './template';
 import { Window } from './Window';
 import MainWindow from './Windows/MainWindow';
@@ -8,11 +8,38 @@ import GameWindow from './Windows/GameWindow';
 import ModsWindow from './Windows/ModsWindow';
 import { LOAD_CONFIG } from './Config';
 import { register, addAsarToLookupPaths } from 'asar-node';
-
+import ModInstallerWindow from './Windows/ModInstallerWindow';
+import { DownloadModLoaderCore } from './Updater';
+import DownloadingCoreWindow from './Windows/DownloadingCoreWindow';
 
 register();
 addAsarToLookupPaths();
+
+if (!fs.existsSync("./userSettings.json")) {
+    fs.writeFileSync("./userSettings.json", template);
+}
+
+let needCoreDownload: boolean = false;
+const updateWindow: DownloadingCoreWindow = new DownloadingCoreWindow();
+
+export function setCoreDownloadComplete(){
+    needCoreDownload = false;
+}
+
+export function setCoreDownloadStarted(id: string){
+    needCoreDownload = true;
+    updateWindow.name = id;
+}
+
+if (!fs.existsSync("./client")){
+    fs.mkdirSync("./client");
+    fs.mkdirSync("./client/roms");
+    fs.mkdirSync("./client/mods");
+}
+
 LOAD_CONFIG();
+
+DownloadModLoaderCore.checkForUpdate();
 
 export default class GUI extends Application {
 
@@ -25,12 +52,17 @@ export default class GUI extends Application {
         this.addWindow(new MainWindow());
         this.addWindow(new GameWindow());
         this.addWindow(new ModsWindow());
+        this.addWindow(new ModInstallerWindow());
         this.addWindow(new ConfigWindow());
     }
 
     onNewFrame(): void {
-        for (let i = 0; i < this.windows.length; i++) {
-            this.windows[i].startDraw();
+        if (!needCoreDownload){
+            for (let i = 0; i < this.windows.length; i++) {
+                this.windows[i].startDraw();
+            }
+        }else{
+            updateWindow.startDraw();
         }
     }
 
@@ -55,10 +87,7 @@ export default class GUI extends Application {
 
 }
 
-if (!fs.existsSync("./userSettings.json")) {
-    fs.writeFileSync("./userSettings.json", template);
-}
-
 let app = new GUI("ModLoader64-gui");
 app.run();
-setTimeout(app.makeWindows.bind(app), 1000);
+
+setTimeout(app.makeWindows.bind(app), 1);

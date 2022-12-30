@@ -111,3 +111,5 @@ tools/tinytsc/tinytsc-win.exe
 tools/tinytsc/tinytsc-linux
 userSettings.json
 ModLoader64-GUI-config.json
+packages
+SDK-Config.json

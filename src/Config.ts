@@ -1,5 +1,6 @@
 import fs from 'fs';
 import { ImGui } from 'ml64tk';
+import { ml_template } from './template';
 
 export interface ModLoader64 {
     rom: string;
@@ -42,9 +43,11 @@ export interface IModLoaderGuiConfig {
     automaticUpdates: boolean;
     overrideRomFolder: string;
     overrideModFolder: string;
+    condaChannels: string[];
 }
 
 class ModLoaderGuiConfig implements IModLoaderGuiConfig {
+    condaChannels: string[] = [];
     overrideRomFolder: string = "";
     overrideModFolder: string = "";
     showAdvancedTab: boolean = false;
@@ -56,6 +59,9 @@ export let GUI_config: IModLoaderGuiConfig;
 
 export function LOAD_CONFIG() {
     if (fs.existsSync("./client/ModLoader64-config.json")) {
+        config = JSON.parse(fs.readFileSync("./client/ModLoader64-config.json").toString());
+    }else{
+        fs.writeFileSync("./client/ModLoader64-config.json", ml_template);
         config = JSON.parse(fs.readFileSync("./client/ModLoader64-config.json").toString());
     }
     if (!fs.existsSync("./ModLoader64-GUI-config.json")) {
@@ -82,6 +88,7 @@ export class ConfigObject {
     serverOverride: ImGui.boolRef;
     overrideRomPath: ImGui.stringRef;
     overrideModPath: ImGui.stringRef;
+    condaUrls: string[] = [];
     // Main window
     nickname: ImGui.stringRef;
     lobby: ImGui.stringRef;
@@ -103,6 +110,8 @@ export class ConfigObject {
         this.lobby = [config['NetworkEngine.Client'].lobby];
         this.password = [config['NetworkEngine.Client'].password];
         this.selectedConsole = [config.ModLoader64.selectedConsole]
+        //
+        this.condaUrls = GUI_config.condaChannels;
     }
 
     update() {
@@ -119,6 +128,8 @@ export class ConfigObject {
         config['NetworkEngine.Client'].lobby = this.lobby[0];
         config['NetworkEngine.Client'].password = this.password[0];
         config.ModLoader64.selectedConsole = this.selectedConsole[0];
+        //
+        GUI_config.condaChannels = this.condaUrls;
         SAVE_CONFIG();
     }
 

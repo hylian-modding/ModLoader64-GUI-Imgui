@@ -7,7 +7,7 @@ export abstract class Window {
     abstract onInit(): void;
 
     startDraw() {
-        if (ImGui.begin("ModLoader64-GUI", undefined)) {
+        if (ImGui.begin("ModLoader64-GUI")) {
             if (ImGui.beginTabBar("MainTabBar")) {
                 if (ImGui.beginTabItem(this.getName())) {
                     this.drawContents();

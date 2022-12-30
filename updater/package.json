@@ -1,5 +1,5 @@
 {
-  "name": "modloader64-gui",
+  "name": "modloader64-gui-updater",
   "version": "3.0.0",
   "description": "",
   "main": "index.js",
@@ -7,9 +7,9 @@
     "postinstall": "npx patch-package",
     "build": "yarn && ts-node ./prebuild.ts && tsc && yarn pkg",
     "copy": "run-script-os",
-    "copy:test:win32": "copy modloader64-gui-win.exe modloader64-gui.exe",
-    "copy:nix": "cp ./modloader64-gui-linux ./modloader64-gui && chmod +x ./modloader64-gui",
-    "dist": "move modloader64-gui-win.exe dist\\windows\\modloader64-gui.exe && move modloader64-gui-linux dist\\linux\\modloader64-gui && ts-node ./dist.ts",
+    "copy:test:win32": "cp ./modloader64-gui-updater-win.exe ./modloader64-gui-updater.exe",
+    "copy:nix": "cp ./modloader64-gui-updater-linux ./modloader64-gui-updater && chmod +x ./modloader64-gui-updater",
+    "dist": "mv ./modloader64-gui-updater-win.exe ./dist/windows/modloader64-gui-updater.exe && mv ./modloader64-gui-updater-linux ./dist/linux/modloader64-gui-updater && ts-node ./dist.ts",
     "pkg": "pkg --compress GZip .",
     "fullbuild": "yarn && yarn tools && yarn build && yarn dist",
     "test": "tsc && node ./build/index.js"
@@ -23,7 +23,6 @@
     "@types/gulp": "^4.0.9",
     "@types/node": "^18.0.6",
     "adm-zip": "^0.5.9",
-    "array-move": "^4.0.0",
     "asar": "^3.2.0",
     "asar-node": "^3.1.1",
     "commander": "^9.3.0",
