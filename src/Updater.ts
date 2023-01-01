@@ -175,6 +175,44 @@ export default class Updater {
         return temp;
     }
 
+    static find(id: string) {
+        for (let i = 0; i < CONDA_REPOS.length; i++) {
+            let check = CONDA_REPOS[i].getFileURL(id, "noarch");
+            if (check) return CONDA_REPOS[i];
+        }
+    }
+
+    static async install(id: string) {
+        setCoreDownloadStarted(id);
+        Updater.downloadFile(id, this.find(id)!, "noarch").then((p: string) => {
+            let nf = path.resolve(packagesFolder, id);
+            if (fs.existsSync(nf)) {
+                fs.removeSync(nf);
+            }
+            fs.mkdirSync(nf);
+            fs.copySync(p, nf);
+            let info = path.resolve(nf, "info");
+            let index = fs.readJSONSync(path.resolve(info, "index.json"));
+            let paths = fs.readJSONSync(path.resolve(info, "paths.json")).paths;
+            console.log(`Processing ${paths.length} paths for package ${id}...`);
+            for (let i = 0; i < paths.length; i++) {
+                let _path = paths[i]._path;
+                makeSymlink(path.resolve(nf, _path), path.resolve(".", _path));
+            }
+            fs.removeSync(p);
+            modBus.emit('REFRESH', {});
+            if (index.depends !== undefined) {
+                for (let i = 0; i < index.depends.length; i++) {
+                    console.log(`Resolving dependency: ${index.depends[i]}...`);
+                    setTimeout(() => {
+                        this.install(index.depends[i]);
+                    }, 1);
+                }
+            }
+            setCoreDownloadComplete();
+        });
+    }
+
     static async getRepoData(url: string) {
         console.log(`Loading channel ${url}...`);
         let rd = new RepoData();
@@ -250,7 +288,7 @@ export class DownloadModLoaderCore {
                     if (v !== this.getLocalVersionString()) {
                         setCoreDownloadStarted("ModLoader64");
                         this.download();
-                    }else{
+                    } else {
                         console.log("No update needed.");
                     }
                     break;
@@ -267,6 +305,7 @@ export interface ModIndexData {
     version: string;
     build: number;
     name: string;
+    depends?: string[];
 }
 
 export interface ModPathData {
@@ -302,26 +341,10 @@ export class ModUpdater {
                     console.log(`Checking ${key} for update...`);
                     let v = CONDA_REPOS[i].getVersionNumber(key, "noarch");
                     if (v !== data.version) {
-                        setCoreDownloadStarted(key);
-                        console.log(check);
-                        Updater.downloadFile(key, CONDA_REPOS[i], "noarch").then((p: string) => {
-                            let nf = path.resolve(packagesFolder, key);
-                            if (fs.existsSync(nf)) {
-                                fs.removeSync(nf);
-                            }
-                            fs.mkdirSync(nf);
-                            fs.copySync(p, nf);
-                            let info = JSON.parse(fs.readFileSync(path.resolve(nf, "info", "paths.json")).toString());
-                            let paths: any[] = info.paths;
-                            for (let i = 0; i < paths.length; i++) {
-                                let _path = paths[i]._path;
-                                makeSymlink(path.resolve(nf, _path), path.resolve(".", _path));
-                            }
-                            fs.removeSync(p);
-                            modBus.emit('REFRESH', {});
-                            setCoreDownloadComplete();
+                        Updater.install(key).then(()=>{}).catch((err: any)=>{
+                            console.log(err);
                         });
-                    }else{
+                    } else {
                         console.log("No update needed.");
                     }
                     break;

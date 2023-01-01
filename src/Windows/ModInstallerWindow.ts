@@ -1,13 +1,9 @@
 import Updater, { CONDA_REPOS, RepoData } from "../Updater";
 import { Window } from "../Window";
 import { ImGui } from "ml64tk";
-import path from 'path';
 import fs from 'fs-extra';
-import { modBus } from "./ModsWindow";
 import { DrawInputTextLeft } from "../Utils";
 import { masterConfigObject } from "../Config";
-import { makeSymlink } from "../makeSymlink";
-import { setCoreDownloadComplete, setCoreDownloadStarted } from "../index";
 
 class ModListing {
     name: string;
@@ -21,11 +17,11 @@ class ModListing {
     }
 }
 
-class SubscribedMod{
+class SubscribedMod {
     name: string;
     file: string;
 
-    constructor(name: string, file: string){
+    constructor(name: string, file: string) {
         this.name = name;
         this.file = file;
     }
@@ -44,7 +40,7 @@ export default class ModInstallerWindow extends Window {
     }
 
     onInit(): void {
-        if (!fs.existsSync(packagesFolder)){
+        if (!fs.existsSync(packagesFolder)) {
             fs.mkdirSync(packagesFolder);
         }
     }
@@ -52,7 +48,7 @@ export default class ModInstallerWindow extends Window {
     drawContents(): void {
         DrawInputTextLeft("Add mod channel", this.addRepoText);
         ImGui.sameLine();
-        if (ImGui.smallButton("Submit###AddModChannelSubmit")){
+        if (ImGui.smallButton("Submit###AddModChannelSubmit")) {
             masterConfigObject.condaUrls.push(this.addRepoText[0]);
             this.addRepoText[0] = "";
             masterConfigObject.update();
@@ -71,34 +67,16 @@ export default class ModInstallerWindow extends Window {
                             this.possibleMods.get(CONDA_REPOS[i].url)!.push(l);
                         });
                     }
-                }).catch((err: any) => { 
+                }).catch((err: any) => {
                     console.error(err);
                 });
             }
         } else {
             this.possibleMods.forEach((value: ModListing[], url: string) => {
-                if (ImGui.treeNode(url)){
+                if (ImGui.treeNode(url)) {
                     for (let i = 0; i < value.length; i++) {
                         if (ImGui.smallButton(value[i].name)) {
-                            setCoreDownloadStarted(value[i].name);
-                            Updater.downloadFile(value[i].name, value[i].repo, "noarch").then((p: string) => {
-                                let nf = path.resolve(packagesFolder, value[i].name);
-                                if (fs.existsSync(nf)){
-                                    fs.removeSync(nf);
-                                }
-                                fs.mkdirSync(nf);
-                                fs.copySync(p, nf);
-                                let info = JSON.parse(fs.readFileSync(path.resolve(nf, "info", "paths.json")).toString());
-                                let paths: any[] = info.paths;
-                                console.log(`Processing ${paths.length} paths for package ${value[i].name}...`);
-                                for (let i = 0; i < paths.length; i++){
-                                    let _path = paths[i]._path;
-                                    makeSymlink(path.resolve(nf, _path), path.resolve(".", _path));
-                                }
-                                fs.removeSync(p);
-                                modBus.emit('REFRESH', {});
-                                setCoreDownloadComplete();
-                            });
+                            Updater.install(value[i].name);
                         }
                     }
                     ImGui.treePop();

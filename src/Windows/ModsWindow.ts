@@ -7,6 +7,7 @@ import { PakFile } from '../PakFormat';
 import { arrayMoveMutable, getFileExt, getFileName, isDirectory } from '../Utils';
 import { EventEmitter } from 'stream';
 import AdmZip from 'adm-zip';
+import { modspacer } from './modspacer';
 
 export const modBus: EventEmitter = new EventEmitter();
 
@@ -24,7 +25,7 @@ class ModEntry {
         this.icon = icon;
         this.tex = new Gfx.Texture();
         if (this.icon === undefined) {
-            this.icon = fs.readFileSync(path.resolve(__dirname, "modspacer.png"));
+            this.icon = modspacer;
         }
         this.tex.loadFromMemory(this.icon);
     }
@@ -298,6 +299,10 @@ export default class ModsWindow extends Window {
     }
 
     drawContents(): void {
+
+        if (ImGui.smallButton("Refresh mods")){
+            modBus.emit("REFRESH", {});
+        }
 
         let subfolderHell = (sub: ModFolders) => {
             ImGui.separator();
