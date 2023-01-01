@@ -1,2 +1,2 @@
-export const VERSION: string = "3.0.0";
+export const VERSION: string = "4.0.1";
 export const BUILD: number = 0;

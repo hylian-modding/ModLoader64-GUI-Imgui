@@ -1,13 +1,13 @@
 package:
   name: modloader64-gui
-  version: 3.0.0
+  version: 4.0.1
 
 source:
   fn: modloader64-gui-conda.zip
   url: ../dist/modloader64-gui-conda.zip
 
 build:
-  number: 0
+  number: 1
   binary_relocation: False
   detect_binary_files_with_prefix: False
   include_recipe: False

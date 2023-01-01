@@ -56,6 +56,7 @@ export default class ModInstallerWindow extends Window {
             masterConfigObject.condaUrls.push(this.addRepoText[0]);
             this.addRepoText[0] = "";
             masterConfigObject.update();
+            this.possibleMods.clear();
         }
         if (this.possibleMods.size === 0) {
             if (ImGui.smallButton("Fetch mods from subscribed channels")) {

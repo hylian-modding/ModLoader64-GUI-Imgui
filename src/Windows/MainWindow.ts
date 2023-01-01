@@ -17,7 +17,8 @@ export default class MainWindow extends Window {
     }
 
     set console(s: string) {
-        config.ModLoader64.selectedConsole = s;
+        masterConfigObject.selectedConsole[0] = s;
+        this.refs.update();
         SAVE_CONFIG();
     }
 
