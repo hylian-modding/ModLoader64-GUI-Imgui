@@ -134,7 +134,7 @@ export class RepoData {
             if (r === "") continue;
             b = value[r].version;
         }
-        return b;
+        return `${b}-${this.getBuildNumber(id)}`;
     }
 }
 
@@ -205,7 +205,10 @@ export default class Updater {
                 for (let i = 0; i < index.depends.length; i++) {
                     console.log(`Resolving dependency: ${index.depends[i]}...`);
                     setTimeout(() => {
-                        this.install(index.depends[i]);
+                        ModUpdater.loadPackageData();
+                        if (!ModUpdater.PACKAGE_INDEX_DATA.has(index.depends[i])) {
+                            this.install(index.depends[i]);
+                        }
                     }, 1);
                 }
             }
@@ -340,8 +343,9 @@ export class ModUpdater {
                 if (check) {
                     console.log(`Checking ${key} for update...`);
                     let v = CONDA_REPOS[i].getVersionNumber(key, "noarch");
-                    if (v !== data.version) {
-                        Updater.install(key).then(()=>{}).catch((err: any)=>{
+                    let vstring = `${data.version}-${data.build}`;
+                    if (v !== vstring) {
+                        Updater.install(key).then(() => { }).catch((err: any) => {
                             console.log(err);
                         });
                     } else {

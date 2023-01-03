@@ -7,7 +7,7 @@ source:
   url: ../dist/modloader64-gui-conda.zip
 
 build:
-  number: 1
+  number: 2
   binary_relocation: False
   detect_binary_files_with_prefix: False
   include_recipe: False
