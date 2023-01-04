@@ -3,21 +3,11 @@ import Updater, { CONDA_URL } from "./Updater";
 import fs from 'fs';
 
 (async () => {
-    let u = new Updater();
-    let repo = await u.getRepoData(CONDA_URL);
-
-    let remote_v = repo.getVersionNumber("modloader64-gui");
-    let remote_b = repo.getBuildNumber("modloader64-gui");
-/*     if (remote_v === VERSION && remote_b === BUILD) {
-        console.log("No update needed.");
-    } else {
-        let url = repo.getFileURL("modloader64-gui");
-        console.log(url);
-    } */
+    let repo = await Updater.getRepoData(CONDA_URL);
 
     let url = repo.getFileURL("modloader64-gui");
     console.log(url);
-    let pkg = await u.downloadFile("modloader64-gui", repo);
+    let pkg = await Updater.downloadFile("modloader64-gui", repo);
 
     let platform = "linux-64";
     if (process.platform === "win32") {

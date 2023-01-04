@@ -76,7 +76,7 @@ export default class ModInstallerWindow extends Window {
                 if (ImGui.treeNode(url)) {
                     for (let i = 0; i < value.length; i++) {
                         if (ImGui.smallButton(value[i].name)) {
-                            Updater.install(value[i].name);
+                            Updater.install(value[i].name, "noarch");
                         }
                     }
                     ImGui.treePop();

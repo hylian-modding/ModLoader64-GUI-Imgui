@@ -5,7 +5,7 @@ import path from 'path';
 import decompress from 'decompress';
 import { masterConfigObject } from './Config';
 import child_process from 'child_process';
-import { setCoreDownloadComplete, setCoreDownloadStarted } from './index';
+import { setCoreDownloadComplete, setCoreDownloadStarted } from '.';
 import { packagesFolder } from './Windows/ModInstallerWindow';
 import { makeSymlink } from './makeSymlink';
 import { modBus } from './Windows/ModsWindow';
@@ -138,9 +138,10 @@ export class RepoData {
     }
 }
 
-export const CONDA_URL: string = "https://repo.modloader64.com/conda/nightly";
+export const CONDA_URL_NIGHTLY: string = "https://repo.modloader64.com/conda/nightly";
+export const CONDA_URL_MUPEN: string = "https://repo.modloader64.com/conda/mupen";
 
-export const CONDA_REPO_URLS: string[] = [CONDA_URL];
+export const CONDA_REPO_URLS: string[] = [CONDA_URL_NIGHTLY, CONDA_URL_MUPEN];
 export const CONDA_REPOS: RepoData[] = [];
 
 export default class Updater {
@@ -150,8 +151,8 @@ export default class Updater {
             CONDA_REPO_URLS.length = 0;
             CONDA_REPO_URLS.push(...masterConfigObject.condaUrls);
         }
-        if (CONDA_REPO_URLS.indexOf(CONDA_URL) === -1) {
-            CONDA_REPO_URLS.push(CONDA_URL);
+        if (CONDA_REPO_URLS.indexOf(CONDA_URL_NIGHTLY) === -1) {
+            CONDA_REPO_URLS.push(CONDA_URL_NIGHTLY);
         }
         if (CONDA_REPOS.length === 0 || forceReload) {
             CONDA_REPOS.length = 0;
@@ -167,7 +168,7 @@ export default class Updater {
 
     static async downloadFile(id: string, data: RepoData, arch?: string) {
         let temp = fs.mkdtempSync("download_");
-        console.log("Downloading...");
+        console.log(`Downloading ${id}...`);
         await download(data.getFileURL(id, arch)!, path.resolve(temp, "temp.tar.bz2"));
         console.log("Extracting...");
         await decompress(path.resolve(temp, "temp.tar.bz2"), path.resolve(temp));
@@ -175,16 +176,26 @@ export default class Updater {
         return temp;
     }
 
-    static find(id: string) {
+    static find(id: string, arch?: string) {
+        let platform = "linux-64";
+        if (process.platform === "win32") {
+            platform = "win-64";
+        }
+        if (arch !== undefined) platform = arch;
         for (let i = 0; i < CONDA_REPOS.length; i++) {
-            let check = CONDA_REPOS[i].getFileURL(id, "noarch");
+            let check = CONDA_REPOS[i].getFileURL(id, platform);
             if (check) return CONDA_REPOS[i];
         }
     }
 
-    static async install(id: string) {
+    static async install(id: string, arch?: string) {
+        let platform = "linux-64";
+        if (process.platform === "win32") {
+            platform = "win-64";
+        }
+        if (arch !== undefined) platform = arch;
         setCoreDownloadStarted(id);
-        Updater.downloadFile(id, this.find(id)!, "noarch").then((p: string) => {
+        Updater.downloadFile(id, this.find(id, arch)!, platform).then((p: string) => {
             let nf = path.resolve(packagesFolder, id);
             if (fs.existsSync(nf)) {
                 fs.removeSync(nf);
@@ -207,7 +218,7 @@ export default class Updater {
                     setTimeout(() => {
                         ModUpdater.loadPackageData();
                         if (!ModUpdater.PACKAGE_INDEX_DATA.has(index.depends[i])) {
-                            this.install(index.depends[i]);
+                            this.install(index.depends[i], arch);
                         }
                     }, 1);
                 }
@@ -245,38 +256,14 @@ export class DownloadModLoaderCore {
 
     static async download() {
         Updater.setupConda().then(() => {
-            for (let i = 0; i < CONDA_REPOS.length; i++) {
-                let check = CONDA_REPOS[i].getFileURL("modloader64-sdk");
-                if (check) {
-                    Updater.downloadFile("modloader64-sdk", CONDA_REPOS[i]).then((p: string) => {
-                        let platform = "linux-64";
-                        if (process.platform === "win32") {
-                            platform = "win-64";
-                        }
-                        let sub = path.resolve(p, "bin", "modloader64");
-                        if (platform === "win-64") {
-                            sub = path.resolve(p, "Scripts", "modloader64.exe");
-                            fs.copyFileSync(sub, "./modloader64.exe");
-                            console.log(child_process.execSync("modloader64.exe").toString());
-                            fs.removeSync("./modloader64.exe");
-                        } else {
-                            fs.copyFileSync(sub, "./modloader64");
-                            console.log(child_process.execSync("./modloader64").toString());
-                            fs.removeSync("./modloader64");
-                        }
-                        fs.removeSync(p);
-                        setCoreDownloadComplete();
-                    });
-                    break;
-                }
-            }
+            Updater.install("modloader64-client");
         }).catch(() => { });
     }
 
     static getLocalVersionString(): string | undefined {
         try {
-            let vf = JSON.parse(fs.readFileSync(path.resolve("./client/src/package.json")).toString());
-            return vf.version;
+            let vf = JSON.parse(fs.readFileSync(path.resolve(packagesFolder, "modloader64-client", "info", "index.json")).toString());
+            return `${vf.version}-${vf.build}`;
         } catch (err) { }
         return undefined;
     }
@@ -284,18 +271,10 @@ export class DownloadModLoaderCore {
     static async checkForUpdate() {
         Updater.setupConda().then(() => {
             console.log("Checking ModLoader core for updates...");
-            for (let i = 0; i < CONDA_REPOS.length; i++) {
-                let check = CONDA_REPOS[i].getFileURL("modloader64-sdk");
-                if (check) {
-                    let v = CONDA_REPOS[i].getVersionNumber("modloader64-sdk");
-                    if (v !== this.getLocalVersionString()) {
-                        setCoreDownloadStarted("ModLoader64");
-                        this.download();
-                    } else {
-                        console.log("No update needed.");
-                    }
-                    break;
-                }
+            let v = Updater.find("modloader64-client")!.getVersionNumber("modloader64-client");
+            let v2 = this.getLocalVersionString();
+            if (v !== v2) {
+                this.download();
             }
             ModUpdater.loadPackageData();
             ModUpdater.checkForUpdates();
@@ -345,7 +324,7 @@ export class ModUpdater {
                     let v = CONDA_REPOS[i].getVersionNumber(key, "noarch");
                     let vstring = `${data.version}-${data.build}`;
                     if (v !== vstring) {
-                        Updater.install(key).then(() => { }).catch((err: any) => {
+                        Updater.install(key, "noarch").then(() => { }).catch((err: any) => {
                             console.log(err);
                         });
                     } else {

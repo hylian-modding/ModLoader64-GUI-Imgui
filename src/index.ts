@@ -1,16 +1,16 @@
-import { Application } from './Application';
+import { addAsarToLookupPaths, register } from 'asar-node';
 import fs from 'fs-extra';
-import { template } from './template';
-import { Window } from './Window';
-import MainWindow from './Windows/MainWindow';
-import ConfigWindow from './Windows/ConfigWindow';
-import GameWindow from './Windows/GameWindow';
-import ModsWindow from './Windows/ModsWindow';
+import { Application } from './Application';
 import { LOAD_CONFIG } from './Config';
-import { register, addAsarToLookupPaths } from 'asar-node';
-import ModInstallerWindow from './Windows/ModInstallerWindow';
 import { DownloadModLoaderCore } from './Updater';
+import { Window } from './Window';
+import ConfigWindow from './Windows/ConfigWindow';
 import DownloadingCoreWindow from './Windows/DownloadingCoreWindow';
+import GameWindow from './Windows/GameWindow';
+import MainWindow from './Windows/MainWindow';
+import ModInstallerWindow from './Windows/ModInstallerWindow';
+import ModsWindow from './Windows/ModsWindow';
+import { template } from './template';
 
 register();
 addAsarToLookupPaths();

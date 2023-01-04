@@ -1,12 +1,20 @@
 import https from 'https';
 import http from 'http';
-import fs from 'fs';
+import fs from 'fs-extra';
 import path from 'path';
 import decompress from 'decompress';
+import child_process from 'child_process';
+import { makeSymlink } from './makeSymlink';
+
+function setCoreDownloadStarted(id: string){}
+function setCoreDownloadComplete(){}
+
+const packagesFolder: string = path.resolve("./packages");
 
 function getJSON(url: string): Promise<any> {
+    const proto = !url.charAt(4).localeCompare('s') ? https : http;
     return new Promise((resolve, reject) => {
-        https.get(url, (res) => {
+        proto.get(url, (res) => {
             let body = "";
 
             res.on("data", (chunk) => {
@@ -72,11 +80,12 @@ export class RepoData {
     data: any;
     subs: Map<string, any> = new Map();
 
-    getFileURL(id: string) {
+    getFileURL(id: string, arch?: string) {
         let platform = "linux-64";
         if (process.platform === "win32") {
             platform = "win-64";
         }
+        if (arch !== undefined) platform = arch;
         for (let entry of this.subs.entries()) {
             let key = entry[0], value = entry[1].packages;
             if (key !== platform) continue;
@@ -92,14 +101,9 @@ export class RepoData {
     }
 
     getBuildNumber(id: string) {
-        let platform = "linux-64";
-        if (process.platform === "win32") {
-            platform = "win-64";
-        }
         let b = -1;
         for (let entry of this.subs.entries()) {
             let key = entry[0], value = entry[1].packages;
-            if (key !== platform) continue;
             let r = "";
             Object.keys(value).forEach((k: string) => {
                 if (id === value[k].name) {
@@ -112,11 +116,12 @@ export class RepoData {
         return b;
     }
 
-    getVersionNumber(id: string) {
+    getVersionNumber(id: string, arch?: string) {
         let platform = "linux-64";
         if (process.platform === "win32") {
             platform = "win-64";
         }
+        if (arch !== undefined) platform = arch;
         let b = "";
         for (let entry of this.subs.entries()) {
             let key = entry[0], value = entry[1].packages;
@@ -130,24 +135,73 @@ export class RepoData {
             if (r === "") continue;
             b = value[r].version;
         }
-        return b;
+        return `${b}-${this.getBuildNumber(id)}`;
     }
 }
 
 export const CONDA_URL: string = "https://repo.modloader64.com/conda/nightly";
 
+export const CONDA_REPO_URLS: string[] = [CONDA_URL];
+export const CONDA_REPOS: RepoData[] = [];
+
 export default class Updater {
 
-    async downloadFile(id: string, data: RepoData) {
+    static async setupConda(forceReload?: boolean) {
+        if (CONDA_REPO_URLS.indexOf(CONDA_URL) === -1) {
+            CONDA_REPO_URLS.push(CONDA_URL);
+        }
+        if (CONDA_REPOS.length === 0 || forceReload) {
+            CONDA_REPOS.length = 0;
+            for (let i = 0; i < CONDA_REPO_URLS.length; i++) {
+                try {
+                    await this.getRepoData(CONDA_REPO_URLS[i]);
+                } catch (err) {
+                    console.error(err);
+                }
+            }
+        }
+    }
+
+    static async downloadFile(id: string, data: RepoData, arch?: string) {
         let temp = fs.mkdtempSync("download_");
         console.log("Downloading...");
-        await download(data.getFileURL(id)!, path.resolve(temp, "temp.tar.bz2"));
+        await download(data.getFileURL(id, arch)!, path.resolve(temp, "temp.tar.bz2"));
         console.log("Extracting...");
         await decompress(path.resolve(temp, "temp.tar.bz2"), path.resolve(temp));
+        fs.removeSync(path.resolve(temp, "temp.tar.bz2"));
         return temp;
     }
 
-    async getRepoData(url: string) {
+    static find(id: string) {
+        for (let i = 0; i < CONDA_REPOS.length; i++) {
+            let check = CONDA_REPOS[i].getFileURL(id, "noarch");
+            if (check) return CONDA_REPOS[i];
+        }
+    }
+
+    static async install(id: string) {
+        setCoreDownloadStarted(id);
+        Updater.downloadFile(id, this.find(id)!, "noarch").then((p: string) => {
+            let nf = path.resolve(packagesFolder, id);
+            if (fs.existsSync(nf)) {
+                fs.removeSync(nf);
+            }
+            fs.mkdirSync(nf);
+            fs.copySync(p, nf);
+            let info = path.resolve(nf, "info");
+            let index = fs.readJSONSync(path.resolve(info, "index.json"));
+            let paths = fs.readJSONSync(path.resolve(info, "paths.json")).paths;
+            console.log(`Processing ${paths.length} paths for package ${id}...`);
+            for (let i = 0; i < paths.length; i++) {
+                let _path = paths[i]._path;
+                makeSymlink(path.resolve(nf, _path), path.resolve(".", _path));
+            }
+            fs.removeSync(p);
+            setCoreDownloadComplete();
+        });
+    }
+
+    static async getRepoData(url: string) {
         console.log(`Loading channel ${url}...`);
         let rd = new RepoData();
         let data = await getJSON(`${url}/channeldata.json`);
@@ -166,7 +220,125 @@ export default class Updater {
             arr.push({ "Name": name, "Version": data.packages[name]["version"], "Build": rd.getBuildNumber(name), "Channel": url });
         });
         console.table(arr);
+        CONDA_REPOS.push(rd);
         return rd;
     }
 
+}
+
+export class DownloadModLoaderCore {
+
+    static async download() {
+        Updater.setupConda().then(() => {
+            for (let i = 0; i < CONDA_REPOS.length; i++) {
+                let check = CONDA_REPOS[i].getFileURL("modloader64-sdk");
+                if (check) {
+                    Updater.downloadFile("modloader64-sdk", CONDA_REPOS[i]).then((p: string) => {
+                        let platform = "linux-64";
+                        if (process.platform === "win32") {
+                            platform = "win-64";
+                        }
+                        let sub = path.resolve(p, "bin", "modloader64");
+                        if (platform === "win-64") {
+                            sub = path.resolve(p, "Scripts", "modloader64.exe");
+                            fs.copyFileSync(sub, "./modloader64.exe");
+                            console.log(child_process.execSync("modloader64.exe").toString());
+                            fs.removeSync("./modloader64.exe");
+                        } else {
+                            fs.copyFileSync(sub, "./modloader64");
+                            console.log(child_process.execSync("./modloader64").toString());
+                            fs.removeSync("./modloader64");
+                        }
+                        fs.removeSync(p);
+                        setCoreDownloadComplete();
+                    });
+                    break;
+                }
+            }
+        }).catch(() => { });
+    }
+
+    static getLocalVersionString(): string | undefined {
+        try {
+            let vf = JSON.parse(fs.readFileSync(path.resolve("./client/src/package.json")).toString());
+            return vf.version;
+        } catch (err) { }
+        return undefined;
+    }
+
+    static async checkForUpdate() {
+        Updater.setupConda().then(() => {
+            console.log("Checking ModLoader core for updates...");
+            for (let i = 0; i < CONDA_REPOS.length; i++) {
+                let check = CONDA_REPOS[i].getFileURL("modloader64-sdk");
+                if (check) {
+                    let v = CONDA_REPOS[i].getVersionNumber("modloader64-sdk");
+                    if (v !== this.getLocalVersionString()) {
+                        setCoreDownloadStarted("ModLoader64");
+                        this.download();
+                    } else {
+                        console.log("No update needed.");
+                    }
+                    break;
+                }
+            }
+            ModUpdater.loadPackageData();
+            ModUpdater.checkForUpdates();
+        });
+    }
+
+}
+
+export interface ModIndexData {
+    version: string;
+    build: number;
+    name: string;
+    depends?: string[];
+}
+
+export interface ModPathData {
+    _path: string;
+}
+
+export class ModUpdater {
+
+    static PACKAGE_INDEX_DATA: Map<string, ModIndexData> = new Map();
+    static PACKAGE_PATH_DATA: Map<string, ModPathData> = new Map();
+
+    static loadPackageData() {
+        this.PACKAGE_INDEX_DATA.clear();
+        this.PACKAGE_PATH_DATA.clear();
+        fs.readdirSync(packagesFolder).forEach((f: string) => {
+            let dir = path.resolve(packagesFolder, f);
+            if (fs.lstatSync(dir).isDirectory()) {
+                let info = path.resolve(dir, "info");
+                let index = fs.readJSONSync(path.resolve(info, "index.json"));
+                let paths = fs.readJSONSync(path.resolve(info, "paths.json"));
+                this.PACKAGE_INDEX_DATA.set(path.parse(dir).name, index);
+                this.PACKAGE_PATH_DATA.set(path.parse(dir).name, paths);
+                console.log(`indexing installed package ${f}`);
+            }
+        });
+    }
+
+    static checkForUpdates() {
+        this.PACKAGE_INDEX_DATA.forEach((data: ModIndexData, key: string) => {
+            for (let i = 0; i < CONDA_REPOS.length; i++) {
+                let check = CONDA_REPOS[i].getFileURL(key, "noarch");
+                if (check) {
+                    console.log(`Checking ${key} for update...`);
+                    let v = CONDA_REPOS[i].getVersionNumber(key, "noarch");
+                    let vstring = `${data.version}-${data.build}`;
+                    if (v !== vstring) {
+                        Updater.install(key).then(() => { }).catch((err: any) => {
+                            console.log(err);
+                        });
+                    } else {
+                        console.log("No update needed.");
+                    }
+                    break;
+                }
+            }
+        });
+    }
 }
