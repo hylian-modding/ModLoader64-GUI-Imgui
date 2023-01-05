@@ -8,7 +8,7 @@ export const ml_template: string = `{
     "ModLoader64": {
       "rom": "",
       "patch": "",
-      "isServer": true,
+      "isServer": false,
       "isClient": true,
       "supportedConsoles": [
         "Mupen64Plus"

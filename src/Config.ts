@@ -94,6 +94,7 @@ export class ConfigObject {
     lobby: ImGui.stringRef;
     password: ImGui.stringRef;
     selectedConsole: ImGui.stringRef;
+    patch: ImGui.stringRef;
     // Game Window
 
     constructor() {
@@ -110,6 +111,7 @@ export class ConfigObject {
         this.lobby = [config['NetworkEngine.Client'].lobby];
         this.password = [config['NetworkEngine.Client'].password];
         this.selectedConsole = [config.ModLoader64.selectedConsole]
+        this.patch = [config.ModLoader64.patch];
         //
         this.condaUrls = GUI_config.condaChannels;
     }
@@ -130,6 +132,8 @@ export class ConfigObject {
         config.ModLoader64.selectedConsole = this.selectedConsole[0];
         //
         GUI_config.condaChannels = this.condaUrls;
+        config.ModLoader64.patch = this.patch[0];
+        config.ModLoader64.isServer = false;
         SAVE_CONFIG();
     }
 

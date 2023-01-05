@@ -65,10 +65,9 @@ class ModEntry {
 
 }
 
-class ModFolders {
+class ModFolder {
     name: string;
     mods: ModEntry[] = [];
-    subfolders: ModFolders[] = [];
 
     constructor(name: string) {
         this.name = name;
@@ -77,7 +76,7 @@ class ModFolders {
 
 export default class ModsWindow extends Window {
 
-    folders: ModFolders[] = [];
+    folder: ModFolder = new ModFolder("root");
     spacerLength: number = -1;
 
     getName(): string {
@@ -87,19 +86,17 @@ export default class ModsWindow extends Window {
     private getLongestModName() {
         let length = 0;
 
-        for (let j = 0; j < this.folders.length; j++) {
-            let mods = this.folders[j].mods;
-            for (let i = 0; i < mods.length; i++) {
-                if (mods[i].meta.name.length > length) {
-                    length = mods[i].meta.name.length;
-                }
+        let mods = this.folder.mods;
+        for (let i = 0; i < mods.length; i++) {
+            if (mods[i].meta.name.length > length) {
+                length = mods[i].meta.name.length;
             }
         }
 
         return length;
     }
 
-    moveItem(folder: ModFolders, index: number, dir: ImGui.Dir) {
+    moveItem(folder: ModFolder, index: number, dir: ImGui.Dir) {
 
         let mods = folder.mods;
 
@@ -117,12 +114,10 @@ export default class ModsWindow extends Window {
     }
 
     findFolderForEntry(mod: ModEntry) {
-        for (let i = 0; i < this.folders.length; i++) {
-            let mods = this.folders[i].mods;
-            for (let j = 0; j < mods.length; j++) {
-                if (mod.meta.name === mods[j].meta.name) {
-                    return this.folders[i];
-                }
+        let mods = this.folder.mods;
+        for (let j = 0; j < mods.length; j++) {
+            if (mod.meta.name === mods[j].meta.name) {
+                return this.folder;
             }
         }
         return undefined;
@@ -163,7 +158,7 @@ export default class ModsWindow extends Window {
         evt["length"] = this.spacerLength;
     }
 
-    readMod(f: string, folder: ModFolders) {
+    readMod(f: string, folder: ModFolder) {
         if (getFileExt(f) === ".pak") {
             console.log(`Found pak ${getFileName(f)}`);
             let pak = new PakFile();
@@ -197,7 +192,7 @@ export default class ModsWindow extends Window {
             let meta: any;
             let icon: Buffer | undefined;
             zip.getEntries().forEach((entry: AdmZip.IZipEntry) => {
-                if (meta === undefined && entry.name.indexOf("package.json") > -1) {
+                if (meta === undefined && entry.name.indexOf("package.json") > -1 && entry.entryName.indexOf("node_modules") === -1) {
                     meta = JSON.parse(entry.getData().toString());
                 }
                 if (icon === undefined && entry.name.indexOf("icon.png") > -1) {
@@ -205,27 +200,36 @@ export default class ModsWindow extends Window {
                 }
             });
             folder.mods.push(new ModEntry(f, meta, icon));
+        } else if (getFileExt(f) === ".bps") {
+            let meta: any = { name: path.parse(f).name, version: "?.?.?" };
+            folder.mods.push(new ModEntry(f, meta, undefined));
         }
     }
 
     clear(): void {
         modBus.removeAllListeners();
         this.spacerLength = -1;
-        this.folders.length = 0;
+        this.folder = new ModFolder("root");
         console.log("Refreshing mods tab...");
         setTimeout(this.onInit.bind(this), 20);
     }
 
     saveLoadout() {
         let loadout: { loadOrder: any, launcherSort: { name: string, mods: string[] }[] } = { loadOrder: {}, launcherSort: [] };
-        this.folders.forEach((value: ModFolders) => {
-            let s: { name: string, mods: string[] } = { name: value.name, mods: [] };
-            for (let i = 0; i < value.mods.length; i++) {
+        let value = this.folder;
+        let s: { name: string, mods: string[] } = { name: value.name, mods: [] };
+        for (let i = 0; i < value.mods.length; i++) {
+            if (getFileExt(value.mods[i].file) === ".bps") {
+                if (value.mods[i].isEnabled[0]) {
+                    masterConfigObject.patch[0] = path.parse(value.mods[i].file).base;
+                    masterConfigObject.update();
+                }
+            } else {
                 loadout.loadOrder[path.parse(value.mods[i].file).base] = value.mods[i].isEnabled[0].toString();
                 s.mods.push(path.parse(value.mods[i].file).base);
             }
-            loadout.launcherSort.push(s);
-        });
+        }
+        loadout.launcherSort.push(s);
         fs.writeFileSync("./client/load_order.json", JSON.stringify(loadout, null, 2));
     }
 
@@ -234,63 +238,58 @@ export default class ModsWindow extends Window {
         if (masterConfigObject.overrideModPath[0] !== "") {
             dir = masterConfigObject.overrideModPath[0];
         }
-        this.folders.push(new ModFolders("Root"));
-        let search = (dir: string, currentFolder: ModFolders) => {
+        let search = (dir: string, currentFolder: ModFolder) => {
             fs.readdirSync(dir).forEach((file: string) => {
                 let f = path.resolve(dir, file);
-                if (isDirectory(f)) {
-                    let index = currentFolder.subfolders.push(new ModFolders(getFileName(f))) - 1;
-                    search(f, currentFolder.subfolders[index]);
-                } else {
+                if (!isDirectory(f)) {
                     this.readMod(f, currentFolder);
                 }
             });
         };
-        search(dir, this.folders[0]);
+        search(dir, this.folder);
         let loadout: { loadOrder: any, launcherSort: { name: string, mods: string[] }[] } = { loadOrder: {}, launcherSort: [] };
         if (fs.existsSync("./client/load_order.json")) {
             loadout = JSON.parse(fs.readFileSync("./client/load_order.json").toString());
         }
-        this.folders.forEach((value: ModFolders) => {
-            // Set checkboxes.
-            for (let i = 0; i < value.mods.length; i++) {
-                if (loadout.loadOrder.hasOwnProperty(path.parse(value.mods[i].file).base)) {
-                    value.mods[i].isEnabled[0] = loadout.loadOrder[path.parse(value.mods[i].file).base] === "true";
-                }
+        let value = this.folder;
+        // Set checkboxes.
+        for (let i = 0; i < value.mods.length; i++) {
+            if (loadout.loadOrder.hasOwnProperty(path.parse(value.mods[i].file).base)) {
+                value.mods[i].isEnabled[0] = loadout.loadOrder[path.parse(value.mods[i].file).base] === "true";
             }
-            // Find folders in sorted data.
-            for (let i = 0; i < loadout.launcherSort.length; i++) {
-                if (loadout.launcherSort[i].name === value.name) {
-                    let order = loadout.launcherSort[i].mods;
-                    let currentMods: string[] = [];
-                    // Compare current mods to load order. Add any ones we haven't sorted.
-                    for (let j = 0; j < value.mods.length; j++) {
-                        let modname = path.parse(value.mods[j].file).base;
-                        currentMods.push(modname);
-                        if (order.indexOf(modname) === -1) {
-                            order.push(modname);
-                        }
+        }
+        // Find folders in sorted data.
+        for (let i = 0; i < loadout.launcherSort.length; i++) {
+            if (loadout.launcherSort[i].name === value.name) {
+                let order = loadout.launcherSort[i].mods;
+                let currentMods: string[] = [];
+                // Compare current mods to load order. Add any ones we haven't sorted.
+                for (let j = 0; j < value.mods.length; j++) {
+                    let modname = path.parse(value.mods[j].file).base;
+                    currentMods.push(modname);
+                    if (order.indexOf(modname) === -1) {
+                        order.push(modname);
                     }
-                    // Remove mods from the sort that aren't installed anymore.
-                    let r: string[] = [];
-                    for (let j = 0; j < order.length; j++) {
-                        if (currentMods.indexOf(order[j]) === -1) {
-                            r.push(order[j]);
-                        }
-                    }
-                    for (let j = 0; j < r.length; j++) {
-                        order.splice(order.indexOf(r[j]), 1);
-                    }
-                    // Apply the sort.
-                    for (let j = 0; j < order.length; j++) {
-                        let index = currentMods.indexOf(order[j]);
-                        arrayMoveMutable(currentMods, index, j);
-                        arrayMoveMutable(value.mods, index, j);
-                    }
-                    break;
                 }
+                // Remove mods from the sort that aren't installed anymore.
+                let r: string[] = [];
+                for (let j = 0; j < order.length; j++) {
+                    if (currentMods.indexOf(order[j]) === -1) {
+                        r.push(order[j]);
+                    }
+                }
+                for (let j = 0; j < r.length; j++) {
+                    order.splice(order.indexOf(r[j]), 1);
+                }
+                // Apply the sort.
+                for (let j = 0; j < order.length; j++) {
+                    let index = currentMods.indexOf(order[j]);
+                    arrayMoveMutable(currentMods, index, j);
+                    arrayMoveMutable(value.mods, index, j);
+                }
+                break;
             }
-        });
+        }
         modBus.on('UP', this.onModSortUp.bind(this));
         modBus.on('DOWN', this.onModSortDown.bind(this));
         modBus.on('SPACER', this.onModSpacerRequest.bind(this));
@@ -300,26 +299,17 @@ export default class ModsWindow extends Window {
 
     drawContents(): void {
 
-        if (ImGui.smallButton("Refresh mods")){
+        if (ImGui.smallButton("Refresh mods")) {
             modBus.emit("REFRESH", {});
         }
 
-        let subfolderHell = (sub: ModFolders) => {
-            ImGui.separator();
-            ImGui.setNextItemOpen(true);
-            if (ImGui.treeNode(`${sub.name}###ModFolder${sub.name}`)) {
-                for (let i = 0; i < sub.mods.length; i++) {
-                    sub.mods[i].drawContents();
-                }
-                for (let i = 0; i < sub.subfolders.length; i++) {
-                    subfolderHell(sub.subfolders[i]);
-                }
-                ImGui.treePop();
+        ImGui.separator();
+        ImGui.setNextItemOpen(true);
+        if (ImGui.treeNode(`${this.folder.name}###ModFolder${this.folder.name}`)) {
+            for (let i = 0; i < this.folder.mods.length; i++) {
+                this.folder.mods[i].drawContents();
             }
-        };
-
-        for (let i = 0; i < this.folders.length; i++) {
-            subfolderHell(this.folders[i]);
+            ImGui.treePop();
         }
     }
 

@@ -153,6 +153,7 @@ export default class Updater {
         }
         if (CONDA_REPO_URLS.indexOf(CONDA_URL_NIGHTLY) === -1) {
             CONDA_REPO_URLS.push(CONDA_URL_NIGHTLY);
+            CONDA_REPO_URLS.push(CONDA_URL_MUPEN);
         }
         if (CONDA_REPOS.length === 0 || forceReload) {
             CONDA_REPOS.length = 0;
