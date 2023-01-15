@@ -140,8 +140,9 @@ export class RepoData {
 
 export const CONDA_URL_NIGHTLY: string = "https://repo.modloader64.com/conda/nightly";
 export const CONDA_URL_MUPEN: string = "https://repo.modloader64.com/conda/mupen";
+export const CONDA_URL_DOLPHIN: string = "https://repo.modloader64.com/conda/dolphin";
 
-export const CONDA_REPO_URLS: string[] = [CONDA_URL_NIGHTLY, CONDA_URL_MUPEN];
+export const CONDA_REPO_URLS: string[] = [CONDA_URL_NIGHTLY, CONDA_URL_MUPEN, CONDA_URL_DOLPHIN];
 export const CONDA_REPOS: RepoData[] = [];
 
 export default class Updater {
@@ -154,6 +155,7 @@ export default class Updater {
         if (CONDA_REPO_URLS.indexOf(CONDA_URL_NIGHTLY) === -1) {
             CONDA_REPO_URLS.push(CONDA_URL_NIGHTLY);
             CONDA_REPO_URLS.push(CONDA_URL_MUPEN);
+            CONDA_REPO_URLS.push(CONDA_URL_DOLPHIN);
         }
         if (CONDA_REPOS.length === 0 || forceReload) {
             CONDA_REPOS.length = 0;
