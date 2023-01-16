@@ -28,7 +28,7 @@ export abstract class Application {
                 clearInterval(loop);
                 this.onQuit();
             }
-        }).bind(this), 0);
+        }).bind(this), 16);
     }
 
     private init(): void {
