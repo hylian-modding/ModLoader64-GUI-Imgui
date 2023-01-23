@@ -309,7 +309,13 @@ export class ModUpdater {
             let dir = path.resolve(packagesFolder, f);
             if (fs.lstatSync(dir).isDirectory()) {
                 let info = path.resolve(dir, "info");
-                let index = fs.readJSONSync(path.resolve(info, "index.json"));
+                let infofile = path.resolve(info, "index.json");
+                if (!fs.existsSync(info) || !fs.existsSync(infofile)){
+                    console.error(`Corrupt package? ${f}`);
+                    console.error(`This package seems to be broken. Information to repair it isn't available. You should reinstall it.`);
+                    return;
+                }
+                let index = fs.readJSONSync(infofile);
                 let paths = fs.readJSONSync(path.resolve(info, "paths.json"));
                 this.PACKAGE_INDEX_DATA.set(path.parse(dir).name, index);
                 this.PACKAGE_PATH_DATA.set(path.parse(dir).name, paths);
