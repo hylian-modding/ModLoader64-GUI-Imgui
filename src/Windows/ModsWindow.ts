@@ -218,9 +218,11 @@ export default class ModsWindow extends Window {
         let loadout: { loadOrder: any, launcherSort: { name: string, mods: string[] }[] } = { loadOrder: {}, launcherSort: [] };
         let value = this.folder;
         let s: { name: string, mods: string[] } = { name: value.name, mods: [] };
+        let hasBPS: boolean = false;
         for (let i = 0; i < value.mods.length; i++) {
             if (getFileExt(value.mods[i].file) === ".bps") {
                 if (value.mods[i].isEnabled[0]) {
+                    hasBPS = true;
                     masterConfigObject.patch[0] = path.parse(value.mods[i].file).base;
                     masterConfigObject.update();
                 }
@@ -228,6 +230,10 @@ export default class ModsWindow extends Window {
                 loadout.loadOrder[path.parse(value.mods[i].file).base] = value.mods[i].isEnabled[0].toString();
                 s.mods.push(path.parse(value.mods[i].file).base);
             }
+        }
+        if (!hasBPS){
+            masterConfigObject.patch[0] = "";
+            masterConfigObject.update();
         }
         loadout.launcherSort.push(s);
         fs.writeFileSync("./client/load_order.json", JSON.stringify(loadout, null, 2));
